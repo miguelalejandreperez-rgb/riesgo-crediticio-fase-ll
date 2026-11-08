@@ -1,0 +1,2 @@
+-r requirements-runtime.txt
+kagglehub>=0.3,<1

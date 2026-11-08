@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#153d46">
+  <title>Riesgo crediticio | Prototipo académico</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <main class="container">
+    <header class="hero">
+      <span class="eyebrow">GESTIÓN DE PROYECTOS DE IA · FASE II</span>
+      <h1>Evaluación experimental de riesgo crediticio</h1>
+      <p>Ingresa información histórica de crédito para obtener una puntuación del modelo y una alerta orientativa.</p>
+      <div id="model-status" class="status">Verificando modelo...</div>
+    </header>
+    <section class="warning" role="note">
+      <strong>Uso exclusivamente académico.</strong> Este sistema usa datos históricos de Taiwán (2005). Su puntuación no está calibrada ni validada para México. No la utilices para aprobar, rechazar o modificar créditos reales ni introduzcas datos personales.
+    </section>
+    <div class="workspace">
+      <form id="risk-form" novalidate>
+        <section class="panel">
+          <div class="panel-heading"><span class="num">01</span><div><h2>Límite de crédito</h2><p>Monto en unidades monetarias del conjunto de datos original (NT$).</p></div></div>
+          <div id="group-credit" class="fields"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><span class="num">02</span><div><h2>Historial de pago</h2><p>Indicadores históricos de situación de pago (-2 a 8). Los valores positivos indican retraso.</p></div></div>
+          <div id="group-status" class="fields three"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><span class="num">03</span><div><h2>Estados de cuenta</h2><p>Importes facturados en seis períodos históricos.</p></div></div>
+          <div id="group-bills" class="fields three"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-heading"><span class="num">04</span><div><h2>Pagos realizados</h2><p>Montos efectivamente pagados en seis períodos históricos.</p></div></div>
+          <div id="group-payments" class="fields three"></div>
+        </section>
+        <div class="action-bar">
+          <button id="run" type="submit">Calcular puntuación</button>
+          <button id="reset" type="button" class="secondary">Reestablecer ejemplo</button>
+        </div>
+      </form>
+      <aside class="result panel" aria-live="polite">
+        <span class="eyebrow">RESULTADO DEL PROTOTIPO</span>
+        <div id="result-content">
+          <div class="placeholder-icon">%</div>
+          <h2>Sin evaluación</h2>
+          <p>Completa el formulario y presiona «Calcular puntuación».</p>
+        </div>
+        <p class="small">El puntaje proviene de <code>predict_proba</code> y no representa una probabilidad calibrada.</p>
+      </aside>
+    </div>
+    <footer>Prototipo Fase II · Python · FastAPI · Docker · <a href="/docs" target="_blank" rel="noreferrer">Documentación interactiva de la API</a></footer>
+  </main>
+</body>
+</html>
