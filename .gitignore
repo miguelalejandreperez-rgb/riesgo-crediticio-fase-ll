@@ -1,0 +1,13 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.venv/
+.env
+*.log
+*.zip
+.kaggle/
+*.csv
+.DS_Store
+
+# El modelo y sus metadatos SI se versionan en Git una vez entrenados.
+# No subir datos originales ni credenciales.

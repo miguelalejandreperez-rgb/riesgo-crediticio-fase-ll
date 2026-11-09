@@ -1,4 +1,3 @@
-[README.md](https://github.com/user-attachments/files/34556927/README.md)
 # Fase II - Prototipo de riesgo crediticio con FastAPI y Docker
 
 **Proyecto educativo de Gestión de Proyectos de Inteligencia Artificial.**
@@ -17,7 +16,9 @@ Este repositorio adapta el notebook `original/Actividad_6_Riesgo_Crediticio.ipyn
 | `app/service.py` | Carga única del pipeline y comprobación de integridad SHA256. |
 | `app/static/` | Formulario sencillo con HTML, CSS y JavaScript. |
 | `scripts/train_and_export.py` | Reproduce Grid Search del modelo boosting y elección del umbral sobre validación. |
-| `scripts/start_codespaces.sh` | Entrena si hace falta, construye Docker y arranca el contenedor. |
+| `scripts/prepare_model.sh` | Entrena y exporta una vez; instala `joblib` y las dependencias de entrenamiento. |
+| `scripts/check_artifacts.py` | Revisa existencia e integridad SHA256 del modelo sin instalar `joblib`. |
+| `scripts/start_codespaces.sh` | Inicia/reutiliza Docker usando el modelo guardado, sin volver a entrenar. |
 | `scripts/smoke_docker.sh` | Prueba HTTP con modelo real. |
 | `tests/` | Pruebas unitarias de API usando un modelo de prueba explícitamente simulado. |
 | `.devcontainer/devcontainer.json` | Codespaces con Docker-in-Docker. |
@@ -33,26 +34,45 @@ Solo se necesitan navegador, cuenta de GitHub e internet. La validación de Dock
 2. Crea un repositorio en https://github.com/new; nombre sugerido `riesgo-crediticio-fase-ii`. Puede ser privado.
 3. En el repositorio vacío, selecciona **uploading an existing file** o **Add file > Upload files**; arrastra el **contenido** de la carpeta `Riesgo_Crediticio_FaseII`, no el archivo ZIP. Asegúrate de incluir carpetas ocultas `.github` y `.devcontainer` y conservar los directorios. Confirma el commit.
 4. En la página del repositorio elige **Code > Codespaces > Create codespace on main**. Espera a que el entorno se prepare y abre su terminal en el navegador.
-5. Ejecuta: `bash scripts/start_codespaces.sh`. El primer uso descargará los datos públicos desde Kaggle, ejecutará la búsqueda CV, seleccionará el umbral, exportará el modelo y construirá Docker. Es normal que el entrenamiento tarde; el acceso a Kaggle depende de internet y de su disponibilidad.
-6. Abre la pestaña **PORTS** de Codespaces y haz clic en el puerto **8000**. Verifica que la visibilidad se mantenga **Private**. En el navegador verá el formulario.
-7. Prueba con el ejemplo precargado; compara el resultado con la documentación de la API en `/docs`. No uses datos personales.
-8. Ejecuta `bash scripts/smoke_docker.sh` para una prueba HTTP real de salud e inferencia. Después ejecuta `bash scripts/registrar_validacion.sh` para guardar un registro de evidencia verificable.
-9. En GitHub, pestaña **Actions**, abre **Construir y verificar Docker con modelo real**, selecciona **Run workflow**; esta acción es opcional y repite un entrenamiento para validar reproducibilidad.
-10. Cuando termines, **detén** el Codespace para no consumir cuota de uso innecesariamente.
+5. **Primera vez, solo si el modelo no está guardado:** ejecuta `bash scripts/prepare_model.sh`. Este comando instala dependencias de entrenamiento en Codespaces, obtiene el dataset, entrena y guarda `artifacts/modelo_riesgo.joblib` y `artifacts/metadata.json`. Si ya existen y son validos, no entrena.
+6. Para que **cualquier Codespace futuro** recupere el mismo modelo, confirma que el archivo `.joblib` sea inferior a 100 MB y registra ambos artefactos en GitHub:
+
+   ```bash
+   git add artifacts/modelo_riesgo.joblib artifacts/metadata.json
+   git commit -m "Guardar modelo entrenado de riesgo crediticio"
+   git push
+   ```
+
+   Este paso NO ocurre automáticamente: si no haces `git push`, el modelo puede desaparecer cuando borres el Codespace. No subas el dataset ni secretos.
+7. **Cada vez que inicies o reabras Codespaces:** ejecuta `bash scripts/start_codespaces.sh`. El script nunca entrena: valida el modelo, reutiliza el contenedor si existe y, de ser necesario, reconstruye la imagen usando los artefactos guardados. Para incorporar cambios de código o del modelo al contenedor: `bash scripts/start_codespaces.sh --rebuild`.
+8. Abre **PORTS** y selecciona puerto **8000** (**Private**). Solo mientras Codespaces y el servidor estén encendidos se podrá usar la aplicación. Prueba el formulario y `/docs`, sin datos personales.
+9. Ejecuta `bash scripts/smoke_docker.sh` para validar salud e inferencia; después `bash scripts/registrar_validacion.sh` para conservar evidencia.
+10. En GitHub, pestaña **Actions**, se puede ejecutar manualmente **Construir y verificar Docker con modelo versionado**; comprueba la misma version del modelo guardado en GitHub sin reentrenar.
+11. Detén el Codespace cuando termines para cuidar la cuota. La aplicación no permanece disponible al público cuando el Codespace se detiene.
+
+### Persistencia del modelo: diferencia entre Git, Codespaces y Docker
+
+- **Artefacto de IA:** `artifacts/modelo_riesgo.joblib` y `artifacts/metadata.json` deben guardarse mediante commit/push en el repositorio. Una vez versionados, otro usuario autorizado puede clonar el repositorio y levantar la misma versión sin entrenar. Verificar que el archivo sea menor de 100 MB; para archivos mayores usar Git LFS o un almacén privado de modelos.
+- **Archivos en Codespaces:** `/workspaces` conserva archivos al detener o reconstruir *ese* Codespace. Si se crea otro Codespace o se elimina el anterior, solo los cambios enviados a GitHub están asegurados.
+- **Contenedor Docker:** puede detenerse, borrarse o recrearse. `start_codespaces.sh` lo recupera o reconstruye con el modelo existente. `--restart unless-stopped` ayuda dentro de un mismo daemon Docker; **no convierte Codespaces en hosting permanente**.
+- **Usuarios:** no reentrenan al calcular un puntaje. La aplicación necesita un servidor encendido; el puerto privado solo está disponible para quienes tienen autorización. Para dar servicio continuo se requiere desplegar la imagen en un PaaS/servidor con autenticación y controles de seguridad.
+- **Si sale `No module named joblib`:** se está tratando de ejecutar el ENTRENAMIENTO sin dependencias. Solo para la preparación inicial ejecuta `bash scripts/prepare_model.sh`; el arranque normal no necesita `joblib` instalado fuera del contenedor.
+- **Si sale `Connection refused`:** comprobar `docker ps` y ejecutar `bash scripts/start_codespaces.sh` antes de `bash scripts/smoke_docker.sh`.
+- **Si el navegador muestra 404 pero `curl localhost` devuelve 200:** revisar PORTS, sesión y permisos del puerto privado; la accesibilidad del túnel de Codespaces es diferente de la salud interna del backend.
 
 **Importante:** GitHub Codespaces puede estar sujeto a límites de cuota, políticas de la cuenta y disponibilidad del servicio. No habilites facturación sin verificar los límites. No se han realizado acciones en tu cuenta de GitHub; el repositorio debes crearlo o conectarlo tú.
 
 ## 3. Entrenar y exportar (si se desea por separado)
 
-Desde Codespaces, antes de Docker:
+Desde Codespaces, **solo la primera vez**:
 
 ```bash
-python scripts/train_and_export.py
+bash scripts/prepare_model.sh
 ```
 
 Crea automáticamente `artifacts/modelo_riesgo.joblib` y `artifacts/metadata.json`. El script verifica que el dataset descargado tenga la huella SHA256 del CSV original del notebook y exige las mismas 19 variables de entrada.
 
-El entrenamiento **no** se ejecuta al arrancar el servidor ni en cada petición. El Dockerfile exige que el modelo exista antes de construir la imagen. Si no existe, `docker build` fallará deliberadamente: primero ejecuta el entrenamiento.
+El entrenamiento **no** se ejecuta al arrancar el servidor ni en cada petición. `start_codespaces.sh` también está diseñado para NO entrenar automáticamente: si no existen los artefactos, muestra instrucciones y se detiene. Guarda y sube los dos archivos a GitHub para evitar el reentrenamiento incluso en Codespaces nuevos.
 
 ## 4. Construir y ejecutar Docker en cualquier equipo compatible
 
@@ -102,7 +122,7 @@ Los resultados que aparecen en el notebook (por ejemplo ROC-AUC cercano a 0.777 
 python -m pytest -q
 ```
 
-Estos tests no usan datos reales ni necesitan Kaggle; validan la interfaz HTTP mediante un doble de pruebas. La prueba `bash scripts/smoke_docker.sh` sí necesita una imagen Docker en ejecución con el modelo real. El workflow manual en GitHub Actions añade la construcción y prueba del contenedor.
+Estos tests no usan datos reales ni necesitan Kaggle; validan la interfaz HTTP mediante un doble de pruebas. La prueba `bash scripts/smoke_docker.sh` sí necesita una imagen Docker en ejecución con el modelo real. El workflow manual en GitHub Actions añade la construcción y prueba del contenedor con los artefactos versionados (sin reentrenar).
 
 ## 8. Limitaciones y seguridad
 
@@ -112,7 +132,7 @@ Estos tests no usan datos reales ni necesitan Kaggle; validan la interfaz HTTP m
 - Se verifica el SHA256 de los datos y del archivo modelo; **joblib no es seguro para cargar artefactos no confiables**.
 - En Codespaces el puerto debe permanecer privado. No existe autenticación de usuario propia en esta demo.
 - Un despliegue de producción requeriría autenticación, monitoreo, auditoría, políticas de seguridad, calibración, validación local y aprobación de riesgo/modelos.
-- El presente paquete no incluye capturas de pantalla de Docker ni afirma que ya se probó Docker: esa ejecución debe realizarse en Codespaces.
+- El paquete actualizado incorpora la solución de persistencia, pero NO incluye el modelo entrenado ni evidencias externas nuevas: el usuario debe ejecutar la preparación inicial en Codespaces, registrar los artefactos en GitHub y documentar pruebas reales. Las capturas compartidas en la conversación han confirmado anteriormente un docker build y un smoke test de inferencia, pero no la funcionalidad del nuevo script.
 
 ## 9. Referencias
 
